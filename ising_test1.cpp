@@ -1,0 +1,455 @@
+#include <string>
+#include <stdlib.h>
+#include <cstdlib>
+#include <stdio.h>
+#include <math.h>
+#include <unistd.h>
+#include <fstream>
+#include <iostream>
+#include <cmath>
+#include <random>
+
+using namespace std;
+
+#define J 1             // Magnetic Dipole Spin
+
+// CMSC 6920 replace the random seed with your student number
+#define SEED 201316338 // Seed for rand() 
+
+/* Global parameters */
+int N;//Dimension of 2D lattice
+int NSPINS;//Total number of spins
+int MCS;//Number of Monte Carlo Steps per temperature change
+double T, dT, TMAX;
+double NORM;
+
+
+/* Physical Constants */
+const double kB = 1.38064852*pow(10,-23);//Boltzmann constant, units: m^2*kg*s^-2*K^-1
+
+random_device rd;
+mt19937 engine;
+uniform_real_distribution<double> realDist;
+uniform_int_distribution<int> intDist;
+
+const string UP   = "\u21BF";   // unicode up arrow (half barb)
+const string DOWN = "\u21C2";   // unicode down arrow (half barb)
+
+// create lookup table of exp(-DeltaE / T)
+double exp_table[9];
+
+// print out the lattice using arrows to indicate spin
+// @param the 2D array representing the lattice
+
+void printSpins(int **lat) 
+{
+  for (int x = 0; x < N; x++) 
+    {
+      for (int y = 0; y < N; y++) 
+	{
+	  string s;
+	  switch (lat[x][y]) 
+	    {
+	    case 1:
+	      s = UP;
+	      break;
+	    case -1:
+	      s = DOWN;
+	      break;
+	    default:
+	      s = "ERR";
+            }
+	  cout << s << " ";
+        }
+      cout << endl;
+    }
+}
+
+
+int mod(int a, int b)
+{ 
+return (a%b+b)%b; 
+}
+
+
+/// Return the bond energy at point (x,y)
+///
+/// The bond energy between site i and neighbor j is defined as
+///  -J * s_i * s_j
+///  For all neighbors:
+///  H_i = -J * s_i * sum(s_j)
+///
+///  @param lat is a 2D array of integers representing the lattice of spins
+///  @param x is the x coordinate of the point in the lattice
+//   @param y is the y coordinate of the point in the lattice
+//   @result the bond energy of point (x,y) in the lattice
+ 
+int bondEnergy(int ** lat, int x, int y) //CMSC6920 DONE
+{
+    /* Neighbor Key
+     *
+     *      o a o
+     *      d i b
+     *      o c o
+     */
+    int NN_x_coords[4] = {x,x+1,x,x-1};//X Coordinates a,b,c,d
+    int NN_y_coords[4] = {y+1,y,y-1,y};//Y Coordinates a,b,c,d
+    int index_x = 0;
+    int index_y = 0;
+    //Modify neighbor indices to account for PCBs
+    
+    for(int i=0;i<4;i++){
+        NN_x_coords[i]= mod(NN_x_coords[i],N);
+        NN_y_coords[i]= mod(NN_y_coords[i],N);
+    }
+
+    //Calculate bond energy
+    int energy=0;
+
+    /* Bond energy between site i and neighbor j is
+     *          -J * s_i * s_j
+     *
+     * For all neighbors:
+     *          H_i = -J * s_i * sum(s_j)
+     *
+     */    
+    for(int i=0;i<4;i++){
+
+      index_x=NN_x_coords[i];
+      index_y=NN_y_coords[i];
+      energy+=-J * lat[y][x] * lat[index_y][index_x];
+      //TODO: Make sure order of indices is right.
+    }
+     return energy;
+}
+
+/// Calculate and return the total energy of the lattice
+///
+/// The total bond energy for the lattice is sum(H_i)
+/// The bond energy between site i and neighbor j is defined as
+///  -J * s_i * s_j
+///  For all neighbors:
+///  H_i = -J * s_i * sum(s_j)
+///
+///  @param lat is a 2D array of integers representing the lattice of spins
+///  @param x is the first point to calculate the bond energy between
+///  @result the total energy of the lattice
+
+int energy(int ** lat) //CMSC6920 DONE
+{
+  cout << "Calculating energy" << endl;
+    /* Total bond energy for lattice is
+     *          sum(H_i)
+     */
+    int totalEnergy=0;
+    for(int i=0;i<N;i++){
+      for(int j=0;j<N;j++){
+        totalEnergy+=bondEnergy(lat,i,j);
+      }
+    }
+    cout << "energy calculated" << endl;
+}
+
+
+/// Calculate and return the total magnetization of a lattice
+///
+/// The total magnetization of a lattice is the sum of all lattice points
+///
+/// @param lat is a 2D array of integers representing the lattice of spins
+/// @result is the net magnetization of the lattice
+
+int magnetization(int ** lat) //CMSC6920 DONE
+{
+    cout << "Calculating magnetization" << endl;
+    int totalMagnetization=0;
+    for(int i=0;i<N;i++){
+      for(int j=0;j<N;j++){
+        totalMagnetization+=lat[j][i];
+      }
+    }
+    cout << "Magnetization calculated" << endl;
+}
+
+/// Calculate whether or not to flip the spin of a lattice position
+///
+/// Return true if the spin at (x,y) of the lattice lat should be
+/// flipped based on the Metropolis criterion at temperature temp
+/// The energy change of the spin flip is
+/// dE = 2 * -H_i = J * s_i * sum(s_j)
+/// you can use the BondEnergy function to calculate the change in spin
+/// will be flipped
+/// Note: total change is twice the bond energy
+///
+/// @param lat is a 2D array of integers representing the lattice of spins
+/// @param x is the x position in the lattice of the spin to be flipped
+/// @param y is the y position in the lattice of the spin to be flipped
+/// @param dE is the change in energy corresponding to the spin flip
+///        it is passed by reference and should be updated for the main
+///        function
+/// @param temp is the temperature
+/// @result true if the spin at (x,y) should be flipped and otherwise false
+
+bool testFlip(int ** lat, int x, int y, int &dE, double temperature) //CMSC6920 DONE
+{
+  /* Energy change upon reversal of spin is
+   *          dE = 2 * -H_i = J * s_i * sum(s_j)
+   *
+   * Note: total change is twice the bond energy
+   */
+  double zeta=0.0; // store the random number in this variable
+  double Pa=0.0; // store acceptance probablity here
+  bool acceptance=false;
+  
+  dE = -2*bondEnergy(lat,x,y);
+  
+  if(dE < 0){
+    acceptance = true;
+  }
+  else{
+    mt19937 engine;
+    uniform_real_distribution<>dist(0,1);
+    engine.seed(time(nullptr));
+    
+    zeta=dist(engine);
+    
+    Pa = exp_table[dE];
+    
+    if(zeta <= Pa){
+      acceptance = true;
+    }
+    else{
+      acceptance = false; // This else statement is kept in as a precaution. 
+    }
+  }
+
+  return(acceptance);
+}
+
+// energies tested can only hold values of 0, 2, 4, 8
+// for efficiency, the lookup table should be configured so that exp_table[dE] directly returns exp(-dE/T)
+// i.e., exp_table[i=2] should access exp( -(dE=2) / T)
+// note that negative values of dE are always accepted, so they should not be tested by exp_table
+
+void initExpLookup(double T)
+{
+  //TODO: Check whether we should include boltzmann factor
+  exp_table[0] = 1;
+  exp_table[2] = exp(-2/(kB*T));
+  exp_table[4] = exp(-4/(kB*T));
+  exp_table[6] = exp(-6/(kB*T));
+  exp_table[8] = exp(-8/(kB*T));
+}
+
+
+void randomize_array(int ** &array,int rows, int columns){
+  mt19937 engine;
+  uniform_real_distribution<>dist(0,1);
+  double rando=0;
+  
+  if(SEED == 0){
+    engine.seed(time(nullptr));
+  }
+  else{
+    engine.seed(SEED);
+  }
+  
+  for(int i=0;i<rows;i++){
+    for(int j=0;j<columns;j++){
+      rando = dist(engine);
+      if(rando >= 0.5){
+        array[i][j] = 1;
+      }
+      else{
+        array[i][j] = -1;
+      }
+    }
+  }
+}
+
+void allocate_array(int ** &array,int rows, int columns){
+  array = new int*[rows];
+  
+  for(int i = 0; i < rows; i++){
+    array[i] = new int[columns];
+  }
+}
+/* Run a simulation */
+
+int main(int argc, char *argv[]) 
+{
+  N=4;
+  
+  engine=mt19937(SEED);
+  uniform_int_distribution<> intDistLattice(0, 1);
+  uniform_int_distribution<> intLattice(0, N);
+  
+  int **lattice;
+
+  // allocate and initialize NxN lattice and assign each point a spin of J
+  allocate_array(lattice,N,N);
+  randomize_array(lattice,N,N);    
+    
+  /* Observables 
+   * M - magnetization
+   * E - energy */
+  
+  int M; double E;        // for a given state
+  
+  // test case 1
+  cout << "Tests of energy and magnetization functions" << endl << endl;
+  cout << "Test Case 1" << endl;
+  cout << "-----------" << endl;
+  printSpins(lattice);
+  E = energy(lattice);
+  M = magnetization(lattice);       
+  
+  cout << "Energy: " << E << " (should be -32)" << endl;
+  cout << "Magnetization: " << M << " (should be 16)" << endl;
+  cout << endl;
+  
+  // test case 2
+  cout << "Test Case 2" << endl;
+  cout << "-----------" << endl;
+  
+  for (int x = 0; x < N; x++)
+    {
+      for (int y = 0; y < N; y++)
+	{
+	  lattice[x][y]=-J;
+	}
+    }
+    
+  printSpins(lattice);
+  E = energy(lattice);
+  M = magnetization(lattice);       
+  
+  cout << "Energy: " << E << " (should be -32)" << endl;
+  cout << "Magnetization: " << M << " (should be -16)" << endl;
+  cout << endl;
+  
+  // test case 3
+  cout << "Test Case 3" << endl;
+  cout << "-----------" << endl;
+  
+  for (int x = 0; x < N; x++)
+    {
+      for (int y = 0; y < N; y++)
+	{
+	  if( (x+y) % 2 ==0)
+	    {
+	      lattice[x][y]=J;
+	    }
+	  else
+	    {
+	      lattice[x][y]=-J;
+	    }
+	}
+    }
+  
+  printSpins(lattice);
+  E = energy(lattice);
+  M = magnetization(lattice);       
+  
+  cout << "Energy: " << E << " (should be 32)" << endl;
+  cout << "Magnetization: " << M << " (should be 0)" << endl;
+  cout << endl << endl;
+  
+  cout << "Tests of bondEnergy" << endl << endl;
+  
+  for (int x = 0; x < N; x++)
+    {
+      lattice[x] = new int[N];
+	
+      for (int y = 0; y < N; y++)
+	{
+	  lattice[x][y]=J;
+	}
+    }
+  printSpins(lattice);
+  cout << "Bond energy at (0,0) = " << bondEnergy(lattice, 0, 0) << " (should be -4)" << endl;
+  cout << "Bond energy at (1,1) = " << bondEnergy(lattice, 1, 1) << " (should be -4)" << endl;
+  cout << "Bond energy at (3,3) = " << bondEnergy(lattice, 3, 3) << " (should be -4)" << endl;
+    
+  cout << "-----------" << endl;
+  
+  for (int x = 0; x < N; x++)
+    {
+      for (int y = 0; y < N; y++)
+	{
+	  if( (x+y) % 2 ==0)
+	    {
+		lattice[x][y]=J;
+	    }
+	  else
+	    {
+	      lattice[x][y]=-J;
+	    }
+	}
+    }
+  
+  printSpins(lattice);
+  
+  cout << "Bond energy at (0,0) = " << bondEnergy(lattice, 0, 0) << " (should be 4)" << endl;
+  cout << "Bond energy at (1,1) = " << bondEnergy(lattice, 1, 1) << " (should be 4)" << endl;
+  cout << "Bond energy at (3,3) = " << bondEnergy(lattice, 3, 3) << " (should be 4)" << endl;
+  cout << "-----------" << endl;
+  
+  for (int x = 0; x < N; x++)
+    {
+      for (int y = 0; y < N; y++)
+	{
+	  if( (x+y) % 2 ==0)
+	    {
+	      lattice[x][y]=J;
+	    }
+	  else
+	    {
+	      lattice[x][y]=-J;
+	    }
+	}
+    }
+  printSpins(lattice);
+  
+  cout << "Bond energy at (0,0) = " << bondEnergy(lattice, 0, 0) << " (should be 4)" << endl;
+  cout << "Bond energy at (1,1) = " << bondEnergy(lattice, 1, 1) << " (should be 4)" << endl;
+  cout << "Bond energy at (3,3) = " << bondEnergy(lattice, 3, 3) << " (should be 4)" << endl;
+
+  cout << "---------" << endl;
+  for (int x = 0; x < N; x++)
+    {
+      for (int y = 0; y < 3; y++)
+	  {
+	    lattice[x][y]=J;
+	  }
+    }
+  
+  for (int x = 0; x < N; x++)
+    {
+      for (int y = 3; y < N; y++)
+	{
+	  lattice[x][y]=-J;
+	}
+    }
+  
+  printSpins(lattice);
+  int dE=4;
+  double temperature=100.0;
+  
+  testFlip(lattice, intLattice(engine), intLattice(engine), dE, temperature);
+
+  cout << "Bond energy at (0,0) = " << bondEnergy(lattice, 0, 0) << " (should be -2)" << endl;
+  cout << "Bond energy at (1,1) = " << bondEnergy(lattice, 1, 1) << " (should be -4)" << endl;
+  cout << "Bond energy at (2,2) = " << bondEnergy(lattice, 2, 2) << " (should be -2)" << endl;
+  cout << "Bond energy at (3,3) = " << bondEnergy(lattice, 3, 3) << " (should be 0)" << endl;
+  
+  initExpLookup(5);
+  cout << "exp lookup table" << endl;
+  for(int i = 0 ;i<9;++i)
+    {
+      cout << "i = " << i << ", E = " << i <<  ", exp(-E/T) = " << exp_table[i] << endl;
+    }
+  
+  // CMSC 6920: add code to free lattice
+  
+  return(0);
+}
