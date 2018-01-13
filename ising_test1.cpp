@@ -117,9 +117,10 @@ int bondEnergy(int ** lat, int x, int y) //CMSC6920 DONE
 
       index_x=NN_x_coords[i];
       index_y=NN_y_coords[i];
-      energy+=-J * lat[y][x] * lat[index_y][index_x];
+      energy+= lat[y][x] * lat[index_y][index_x];
       //TODO: Make sure order of indices is right.
     }
+     energy= energy*(-J);
      return energy;
 }
 
@@ -148,6 +149,7 @@ int energy(int ** lat) //CMSC6920 DONE
       }
     }
     cout << "energy calculated" << endl;
+    return totalEnergy/2;
 }
 
 
@@ -168,6 +170,7 @@ int magnetization(int ** lat) //CMSC6920 DONE
       }
     }
     cout << "Magnetization calculated" << endl;
+    return totalMagnetization;
 }
 
 /// Calculate whether or not to flip the spin of a lattice position
