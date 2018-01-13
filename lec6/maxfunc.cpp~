@@ -1,0 +1,38 @@
+#include<iostream>
+
+using namespace std;
+
+int maxmul(int a, int b, int c)
+{
+  int product=0;
+  cout << "a: " << a << " b: " << b << " c: " << c << endl;
+  if(a>=b){
+    if(b>=c){
+      product=a*b;
+      cout << "a >= b >= c" << endl;
+    }
+    else{
+      product=a*c;
+      cout << "a >= c >= b" << endl;
+    }
+  }
+  else{
+    if(a>=c){
+      product=b*a;
+      cout << "b >= a >= c" << endl;
+    }
+    else{
+      product=b*c;
+      cout << "b >= c >= a" << endl;  
+    }
+  }
+  
+  return product;
+}
+
+int main()
+{
+    cout << maxmul(1,2,3) << endl;
+    cout << maxmul(3,1,2) << endl;
+    cout << maxmul(3,2,1) << endl;
+} 
