@@ -409,9 +409,11 @@ int main(int argc, char *argv[])
   
   for(double temp=T;temp<TMAX;temp+=dT) 
     {
+
       /* Energy and magnetization of initial state */
       E = energy(lattice);
       M = magnetization(lattice);
+      cout << temp << " " << E << " " << M << endl;
       initExpLookup(temp);
       
       // perform EQMCS steps of Monte Carlo Sampling to equilibriate the lattice at
