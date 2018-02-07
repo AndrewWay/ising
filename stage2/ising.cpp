@@ -413,7 +413,6 @@ int main(int argc, char *argv[])
       /* Energy and magnetization of initial state */
       E = energy(lattice);
       M = magnetization(lattice);
-      cout << temp << " " << E << " " << M << endl;
       initExpLookup(temp);
       
       // perform EQMCS steps of Monte Carlo Sampling to equilibriate the lattice at
@@ -426,7 +425,7 @@ int main(int argc, char *argv[])
       // CMSC6920: Complete this loop to perform PMCS Metropolis Monte
       // Carlo iteration. These are the production/sampling cycles. The 
       // Each Monte Carlo iteration is comprised of  NSPINS spip-flip attempts
-      for(int i=0;i<PMCS;i++){
+      for(int i=0;i<EQMCS;i++){
         for(int n=0;n<NSPINS;n++){
         
           x = intLattice(engine);
@@ -450,7 +449,7 @@ int main(int argc, char *argv[])
       // E and M with that difference
       // each Monte Carlo step should involve N^2 attempts to flip the
       // spin of a random lattice point
-      for(int i=0;i<EQMCS;i++){
+      for(int i=0;i<PMCS;i++){
         for(int n=0;n<NSPINS;n++){
         
           x = intLattice(engine);
@@ -466,6 +465,7 @@ int main(int argc, char *argv[])
         }
       }
       
+      E_
       // after each Monte Carlo step calculate
       // the sum of the energy and magnetization of new lattice
       // configuration
@@ -480,6 +480,7 @@ int main(int argc, char *argv[])
 	      E_avg, E_avg*E_avg, fabs(M_avg) );
       ofile << s;
       printSpins(lattice);
+      cout << temp << " " << E_avg << " " << M_avg << endl;
     } // END Temperature Loop
   
   // CMSC 6920: free memory used for lattice
