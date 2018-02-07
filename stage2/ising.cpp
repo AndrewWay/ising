@@ -435,7 +435,7 @@ int main(int argc, char *argv[])
           if(verdict == true){
             lattice[x][y] *= -1;
             E+=dE;
-            M=lattice[x][y];
+            M+=2*lattice[x][y];
           }
         }
       }
@@ -461,7 +461,7 @@ int main(int argc, char *argv[])
           if(verdict == true){
             lattice[x][y] *= -1;
             E+=dE;
-            M=lattice[x][y];
+            M+=2*lattice[x][y];
           }    
         }
         E_tot+=E;
