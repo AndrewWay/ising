@@ -440,8 +440,8 @@ int main(int argc, char *argv[])
       }
       
       // Reset sums before start of production simulation at temperature T 
-      E_tot = E;
-      M_tot = M;
+      E_tot = 0;
+      M_tot = 0;
       
       // You should not recalculate E and M for each Monte Carlo cycle
       // These values can be calculated more efficiently by determining
@@ -459,9 +459,11 @@ int main(int argc, char *argv[])
           
           if(verdict == true){
             lattice[x][y] *= -1;
-            E_tot+=dE;
-            M_tot += lattice[x][y];
+            E+=dE;
+            M+=lattice[x][y];
           }
+          E_tot+=E;
+          M_tot+=M;        
         }
       }
       

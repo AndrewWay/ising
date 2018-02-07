@@ -459,13 +459,14 @@ int main(int argc, char *argv[])
           
           if(verdict == true){
             lattice[x][y] *= -1;
-            E_tot+=dE;
-            M_tot += lattice[x][y];
+            E+=dE;
+            M+=lattice[x][y];
           }
+          E_tot+=E;
+          M_tot+=M;        
         }
       }
       
-      E_
       // after each Monte Carlo step calculate
       // the sum of the energy and magnetization of new lattice
       // configuration
