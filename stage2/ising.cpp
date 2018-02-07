@@ -389,8 +389,6 @@ int main(int argc, char *argv[])
    * M - magnetization
    * E - energy */
   
-  printSpins(lattice);
-  
   int M=0;
   double E=0;        // for a given state
   double M_avg, E_avg;    // ensemble averages
@@ -412,7 +410,8 @@ int main(int argc, char *argv[])
       
       /* Energy and magnetization of initial state */
       E = energy(lattice);
-      M = magnetization(lattice);
+      M = magnetization(lattice); 
+      cout << E << " " << M << endl;
       initExpLookup(temp);
       
       // perform EQMCS steps of Monte Carlo Sampling to equilibriate the lattice at
@@ -435,6 +434,8 @@ int main(int argc, char *argv[])
           
           if(verdict == true){
             lattice[x][y] *= -1;
+            E+=dE;
+            M=lattice[x][y];
           }
         }
       }
@@ -460,11 +461,11 @@ int main(int argc, char *argv[])
           if(verdict == true){
             lattice[x][y] *= -1;
             E+=dE;
-            M+=lattice[x][y];
-          }
-          E_tot+=E;
-          M_tot+=M;        
+            M=lattice[x][y];
+          }    
         }
+        E_tot+=E;
+        M_tot+=M;    
       }
       
       // after each Monte Carlo step calculate
@@ -480,8 +481,7 @@ int main(int argc, char *argv[])
       sprintf(s, "%-7.2f%12.3f%12.3f%12.3f\n", temp,
 	      E_avg, E_avg*E_avg, fabs(M_avg) );
       ofile << s;
-      printSpins(lattice);
-      cout << temp << " " << E_avg << " " << M_avg << endl;
+      cout <<temp << " " << E_avg << " " << M_avg << endl;
     } // END Temperature Loop
   
   // CMSC 6920: free memory used for lattice
